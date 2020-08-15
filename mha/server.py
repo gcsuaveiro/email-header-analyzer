@@ -16,6 +16,9 @@ from IPy import IP
 import geoip2.database
 
 import argparse
+import subprocess
+
+import whois
 
 app = Flask(__name__)
 reader = geoip2.database.Reader(
@@ -179,8 +182,8 @@ def index():
             style=custom_style, height=250, legend_at_bottom=True,
             tooltip_border_radius=10)
         line_chart.tooltip_fancy_mode = False
-        line_chart.title = 'Total Delay is: %s' % fTotalDelay
-        line_chart.x_title = 'Delay in seconds.'
+        line_chart.title = 'Tiempo total: %s' % fTotalDelay
+        line_chart.x_title = 'Tiempo en segundos.'
         for i in graph:
             line_chart.add(i[0], i[1])
         chart = line_chart.render(is_unicode=True)
@@ -192,10 +195,70 @@ def index():
             'Subject': n.get('Subject') or getHeaderVal('Subject', mail_data),
             'MessageID': n.get('Message-ID') or getHeaderVal('Message-ID', mail_data),
             'Date': n.get('Date') or getHeaderVal('Date', mail_data),
+            'Return': n.get('Return-Path') or getHeaderVal('Return-Path', mail_data),
         }
 
         security_headers = ['Received-SPF', 'Authentication-Results',
-                            'DKIM-Signature', 'ARC-Authentication-Results']
+                            'DKIM-Signature', 'ARC-Authentication-Results' ]
+
+        try:
+            email = n.get('From') or getHeaderVal('from', mail_data)
+            d = email.split('@')[1].replace(">","")            
+            w = whois.query(d , ignore_returncode=1)
+            if w:
+                wd = w.__dict__
+                for k, v in wd.items():
+                    summary[ k ] = v        # SE RELLENAN LOS DATOS DE WHOIS  __DICT__
+                    if k == 'creation_date':
+                        fecha = datetime.today() - v
+                        meses = round( fecha.days / 60 )
+                        if meses < 12:
+                            summary[ 'diff' ] = ' ( PELIGRO ' + str( meses ) + ' MESES DE VIDA!!!! )'
+                        else:
+                            any = round( meses / 12 )
+                            summary[ 'diff' ] = str( any ) + ' Años'
+        except Exception as e:
+            print( e )
+            summary[ 'name' ] = 'ERROR AL BUSCAR'
+            summary[ 'creation_date' ] = 'ERROR AL BUSCAR'
+            summary[ 'last_updated' ] = 'ERROR AL BUSCAR'
+            summary[ 'expiration_date' ] = 'ERROR AL BUSCAR'
+            summary[ 'name_servers' ] = 'ERROR AL BUSCAR'
+
+        analiza = n.get('Authentication-Results') or getHeaderVal('Authentication-Results', mail_data)
+        puntuacion = 0
+        if analiza.find('spf=pass') >= 0:
+            summary[ 'SPF' ] = 'OK.'
+            puntuacion += 1
+        else:
+            if analiza.find('spf=') >= 0:
+                summary[ 'SPF' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
+                puntuacion -= 2
+            else:
+                summary[ 'SPF' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+
+        if analiza.find('dkim=pass') >= 0:
+            summary[ 'DKIM' ] = 'OK.'
+            puntuacion += 1
+        else:
+            if analiza.find('dkim=') >= 0:
+                summary[ 'DKIM' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
+                puntuacion -= 2
+            else:
+                summary[ 'DKIM' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+
+        if analiza.find('dmarc=pass') >= 0:
+            summary[ 'DMARC' ] = 'OK.'
+            puntuacion += 1
+        else:
+            if analiza.find('dmarc=') >= 0:
+                summary[ 'DMARC' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
+                puntuacion -= 2
+            else:
+                summary[ 'DMARC' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+
+        summary[ 'resultado_seguridad' ] = str( round( (puntuacion / 3) * 100, 2 ) ) + '%'
+
         return render_template(
             'index.html', data=r, delayed=delayed, summary=summary,
             n=n, chart=chart, security_headers=security_headers)
@@ -203,11 +266,12 @@ def index():
         return render_template('index.html')
 
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mail Header Analyser")
     parser.add_argument("-d", "--debug", action="store_true", default=False,
                         help="Enable debug mode")
-    parser.add_argument("-b", "--bind", default="127.0.0.1", type=str)
+    parser.add_argument("-b", "--bind", default="0.0.0.0", type=str)
     parser.add_argument("-p", "--port", default="8080", type=int)
     args = parser.parse_args()
 
