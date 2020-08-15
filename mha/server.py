@@ -87,6 +87,7 @@ def getHeaderVal(h, data, rex='\s*(.*?)\n\S+:\s'):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        lista_IP = []
         mail_data = request.form['headers'].strip()
         r = {}
         n = HeaderParser().parsestr(mail_data)
@@ -133,6 +134,9 @@ def index():
                         (?:\sid\s|$)
                         |\sid\s|$
                     )""", line[0], re.DOTALL | re.X)
+                tmp_lista_IP = re.findall( r"\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]", line[0], re.X)
+                for x in range( len( tmp_lista_IP ) ):
+                    lista_IP.append( tmp_lista_IP[ x ] )
             else:
                 data = re.findall(
                     """
