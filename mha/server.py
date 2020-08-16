@@ -20,6 +20,9 @@ import subprocess
 
 import whois
 
+import json
+import urllib.request
+
 app = Flask(__name__)
 reader = geoip2.database.Reader(
     '%s/data/GeoLite2-Country.mmdb' % app.static_folder)
@@ -92,6 +95,7 @@ def index():
         r = {}
         n = HeaderParser().parsestr(mail_data)
         graph = []
+        iP_Analizado = []
         received = n.get_all('Received')
         if received:
             received = [i for i in received if ('from' in i or 'by' in i)]
@@ -205,6 +209,26 @@ def index():
         security_headers = ['Received-SPF', 'Authentication-Results',
                             'DKIM-Signature', 'ARC-Authentication-Results' ]
 
+        for x in range( len( lista_IP ) ):
+            web = 'http://ipinfo.io/' + lista_IP[ x ] + '/json'
+            with urllib.request.urlopen( web ) as url:
+                data = json.loads( url.read().decode() )
+            if( ('hostname' not in data) ):
+                data[ 'hostname' ] = 'Desconocido'
+            if( ('city' not in data) ):
+                data[ 'city' ] = 'Desconocida'
+            if( ('region' not in data) ):
+                data[ 'region' ] = 'Desconocida'
+            if( ('country' not in data) ):
+                data[ 'country' ] = 'Desconocido'
+            if( ('loc' not in data) ):
+                data[ 'loc' ] = '0,0'
+            if( ('org' not in data) ):
+                data[ 'org' ] = 'Desconocida'
+            if( ('postal' not in data) ):
+                data[ 'postal' ] = '0'
+            iP_Analizado.append( Address( lista_IP[ x ], data[ 'hostname' ], data[ 'city' ], data[ 'region' ], data[ 'country' ], data[ 'loc' ], data[ 'org' ], data[ 'postal' ] ) )
+
         try:
             email = n.get('From') or getHeaderVal('from', mail_data)
             d = email.split('@')[1].replace(">","")            
@@ -269,7 +293,16 @@ def index():
     else:
         return render_template('index.html')
 
-
+class Address:
+  def __init__(self, iP, hostname = 'desconocido', ciudad = 'desconocido', region = 'desconocido', pais = 'desconocido', gps = 'desconocido', empresa = 'desconocido', cp = 'desconocido' ):
+    self.iP = iP
+    self.hostname = hostname
+    self.ciudad = ciudad
+    self.region = region
+    self.pais = pais
+    self.gps = gps
+    self.empresa = empresa
+    self.cp = cp
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mail Header Analyser")
