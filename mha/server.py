@@ -212,22 +212,22 @@ def index():
         for x in range( len( lista_IP ) ):
             web = 'http://ipinfo.io/' + lista_IP[ x ] + '/json'
             with urllib.request.urlopen( web ) as url:
-                data = json.loads( url.read().decode() )
-            if( ('hostname' not in data) ):
-                data[ 'hostname' ] = 'Desconocido'
-            if( ('city' not in data) ):
-                data[ 'city' ] = 'Desconocida'
-            if( ('region' not in data) ):
-                data[ 'region' ] = 'Desconocida'
-            if( ('country' not in data) ):
-                data[ 'country' ] = 'Desconocido'
-            if( ('loc' not in data) ):
-                data[ 'loc' ] = '0,0'
-            if( ('org' not in data) ):
-                data[ 'org' ] = 'Desconocida'
-            if( ('postal' not in data) ):
-                data[ 'postal' ] = '0'
-            iP_Analizado.append( Address( lista_IP[ x ], data[ 'hostname' ], data[ 'city' ], data[ 'region' ], data[ 'country' ], data[ 'loc' ], data[ 'org' ], data[ 'postal' ] ) )
+                datos_ip = json.loads( url.read().decode() )
+            if( ('hostname' not in datos_ip) ):
+                datos_ip[ 'hostname' ] = 'Desconocido'
+            if( ('city' not in datos_ip) ):
+                datos_ip[ 'city' ] = 'Desconocida'
+            if( ('region' not in datos_ip) ):
+                datos_ip[ 'region' ] = 'Desconocida'
+            if( ('country' not in datos_ip) ):
+                datos_ip[ 'country' ] = 'Desconocido'
+            if( ('loc' not in datos_ip) ):
+                datos_ip[ 'loc' ] = '0,0'
+            if( ('org' not in datos_ip) ):
+                datos_ip[ 'org' ] = 'Desconocida'
+            if( ('postal' not in datos_ip) ):
+                datos_ip[ 'postal' ] = '0'
+            iP_Analizado.append( Address( lista_IP[ x ], datos_ip[ 'hostname' ], datos_ip[ 'city' ], datos_ip[ 'region' ], datos_ip[ 'country' ], datos_ip[ 'loc' ], datos_ip[ 'org' ], datos_ip[ 'postal' ] ) )
 
         try:
             email = n.get('From') or getHeaderVal('from', mail_data)
@@ -289,7 +289,7 @@ def index():
 
         return render_template(
             'index.html', data=r, delayed=delayed, summary=summary,
-            n=n, chart=chart, security_headers=security_headers)
+            n=n, chart=chart, security_headers=security_headers, iP_Analizado=iP_Analizado)
     else:
         return render_template('index.html')
 

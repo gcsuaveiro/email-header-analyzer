@@ -115,6 +115,36 @@
             data-sort-order="asc">
             <thead style="background-color: #333333;color:#d4d4d4;">
                 <tr>
+                    <th data-sortable="true">IP</th>
+                    <th data-sortable="true">NOMBRE</th>
+                    <th data-sortable="true">PAIS</th>
+                    <th data-sortable="true">CIUDAD</th>
+                    <th data-sortable="true">REGION</th>
+                    <th data-sortable="true">GPS</th>
+                    <th data-sortable="true">EMPRESA</th>
+                    <th data-sortable="true">CP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in iP_Analizado %}
+                <tr>
+                    <td>{{ v.iP }}</td>
+                    <td>{{ v.hostname }}</td>
+                    <td>{{ v.pais }}</td>
+                    <td>{{ v.ciudad }}</td>
+                    <td>{{ v.region }}</td>
+                    <td>{{ v.gps }}</td>
+                    <td>{{ v.empresa }}</td>
+                    <td>{{ v.cp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <table id="table" data-toggle="table" data-search="true" data-show-columns="true" data-striped="true"
+            data-show-toggle="true" data-show-refresh="true" data-page-size="13" data-sort-name="hop"
+            data-sort-order="asc">
+            <thead style="background-color: #333333;color:#d4d4d4;">
+                <tr>
                     <th data-field="hop" data-sortable="true">Hop</th>
                     <th data-sortable="true">Origen</th>
                     <th data-sortable="true">Desde</th>
