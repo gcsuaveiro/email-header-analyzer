@@ -90,6 +90,8 @@ def getHeaderVal(h, data, rex='\s*(.*?)\n\S+:\s'):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        with open( 'freemail' ) as f:
+            emailFree = [ line.rstrip() for line in f ]
         lista_IP = []
         mail_data = request.form['headers'].strip()
         r = {}
@@ -154,8 +156,8 @@ def index():
                     )""", line[0], re.DOTALL | re.X)
 
             delay = (org_time - next_time).seconds
-            if delay < 0:
-                delay = 0
+            if delay <= 0:
+                delay = 1
 
             try:
                 ftime = org_time.utctimetuple()
@@ -231,7 +233,11 @@ def index():
 
         try:
             email = n.get('From') or getHeaderVal('from', mail_data)
-            d = email.split('@')[1].replace(">","")            
+            d = email.split('@')[1].replace(">","")
+            if d in emailFree:
+                summary[ 'tipo' ] = ' ( CUIDADO CORREO GRATUITO )'
+            else:
+                summary[ 'tipo' ] = 'Correo electronico normal'
             w = whois.query(d , ignore_returncode=1)
             if w:
                 wd = w.__dict__
