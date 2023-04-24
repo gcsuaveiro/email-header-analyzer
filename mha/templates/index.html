@@ -73,12 +73,46 @@
                         <dd>{{ summary.Date }}</dd>
                         <dt>From</dt>
                         <dd>{{ summary.From }}</dd>
+                        <dt>Return</dt>
+                        <dd>{{ summary.Return }}</dd>
                         <dt>To</dt>
                         <dd>{{ summary.To }}</dd>
                         {% if summary.Cc %}
                         <dt>Cc</dt>
                         <dd>{{ summary.Cc }}</dd>
                         {% endif %}
+                        <dt>-</dt>
+                        <dd>-</dd>
+                        <dt>Sender Domain</dt>
+                        {% if summary.whois_error %}
+                        <dd>{{ summary.whois_error }}</dd>
+                        {% else %}
+                        <dd>{{ summary.name }}</dd>
+                        {% endif %}
+                        <dt>Type</dt>
+                        <dd>{{ summary.email_domain_type }}</dd>
+                        {% if not summary.whois_error %}
+                        <dt>Domain Creation Date</dt>
+                        <dd>{{ summary.creation_date }} : {{ summary.diff }}</dd>
+                        <dt>Domain Update Date</dt>
+                        <dd>{{ summary.last_updated }}</dd>
+                        <dt>Domain Expire Date</dt>
+                        <dd>{{ summary.expiration_date }}</dd>
+                        <dt>Domain Nameservers</dt>
+                        <dd>{{ summary.name_servers }}</dd>
+                        {% endif %}
+                        <dt>-</dt>
+                        <dd>-</dd>
+                        <dt>-</dt>
+                        <dd>-</dd>
+                        <dt>SPF</dt>
+                        <dd>{{ summary.SPF }}</dd>
+                        <dt>DKIM</dt>
+                        <dd>{{ summary.DKIM }}</dd>
+                        <dt>DMARC</dt>
+                        <dd>{{ summary.DMARC }}</dd>
+                        <dt>Security Result</dt>
+                        <dd>{{ summary.security_result}}</dd>
                     </dl>
                 </div>
                 {% if delayed %}
@@ -89,6 +123,36 @@
                 {% endif %}
             </div>
         </div>
+        <table id="table" data-toggle="table" data-search="true" data-show-columns="true" data-striped="true"
+            data-show-toggle="true" data-show-refresh="true" data-page-size="13" data-sort-name="hop"
+            data-sort-order="asc">
+            <thead style="background-color: #333333;color:#d4d4d4;">
+                <tr>
+                    <th data-sortable="true">IP</th>
+                    <th data-sortable="true">Name</th>
+                    <th data-sortable="true">Country</th>
+                    <th data-sortable="true">City</th>
+                    <th data-sortable="true">Regions</th>
+                    <th data-sortable="true">GPS</th>
+                    <th data-sortable="true">Organization</th>
+                    <th data-sortable="true">Postal Code</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in ip_checked %}
+                <tr>
+                    <td>{{ v.ip_address }}</td>
+                    <td>{{ v.hostname }}</td>
+                    <td>{{ v.country }}</td>
+                    <td>{{ v.city}}</td>
+                    <td>{{ v.region }}</td>
+                    <td>{{ v.gps }}</td>
+                    <td>{{ v.organization }}</td>
+                    <td>{{ v.postal_code }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         <table id="table" data-toggle="table" data-search="true" data-show-columns="true" data-striped="true"
             data-show-toggle="true" data-show-refresh="true" data-page-size="13" data-sort-name="hop"
             data-sort-order="asc">
