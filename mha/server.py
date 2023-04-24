@@ -16,6 +16,14 @@ from IPy import IP
 import geoip2.database
 
 import argparse
+import subprocess
+
+import whois
+
+import json
+import urllib.request
+
+import logging
 
 app = Flask(__name__)
 reader = geoip2.database.Reader(
@@ -89,17 +97,22 @@ def index():
     if request.method == 'POST':
         # fill mail data with either uploaded file or form, upload has priority
         mail_data = ""
-        try: 
+        try:
             # if there is a file upload, read the file, and decode the binary stream
             eml = request.files['file']
             mail_data = eml.read().decode()
-        except Exception as e: 
+        except Exception as e:
             # if anything goes wrong, revert to form
             mail_data = request.form['headers'].strip()
 
+        with open( 'freemail' ) as f:
+            emailFree = [ line.rstrip() for line in f ]
+        ip_address_list = []
+        mail_data = request.form['headers'].strip()
         r = {}
         n = HeaderParser().parsestr(mail_data)
         graph = []
+        ip_checked = []
         received = n.get_all('Received')
         if received:
             received = [i for i in received if ('from' in i or 'by' in i)]
@@ -142,6 +155,9 @@ def index():
                         (?:\sid\s|$)
                         |\sid\s|$
                     )""", line[0], re.DOTALL | re.X)
+                tmp_lista_IP = re.findall( r"\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]", line[0], re.X)
+                for x in range( len( tmp_lista_IP ) ):
+                    ip_address_list.append( tmp_lista_IP[ x ] )
             else:
                 data = re.findall(
                     """
@@ -204,16 +220,112 @@ def index():
             'Subject': n.get('Subject') or getHeaderVal('Subject', mail_data),
             'MessageID': n.get('Message-ID') or getHeaderVal('Message-ID', mail_data),
             'Date': n.get('Date') or getHeaderVal('Date', mail_data),
+            'Return': n.get('Return-Path') or getHeaderVal('Return-Path', mail_data),
         }
 
         security_headers = ['Received-SPF', 'Authentication-Results',
                             'DKIM-Signature', 'ARC-Authentication-Results']
+
+        for x in range( len( ip_address_list ) ):
+            web = 'http://ipinfo.io/' + ip_address_list[ x ] + '/json'
+
+            with urllib.request.urlopen( web ) as url:
+                ip_address_data = json.loads( url.read().decode() )
+            if( ('hostname' not in ip_address_data) ):
+                ip_address_data[ 'hostname' ] = 'Unknown'
+            if( ('city' not in ip_address_data) ):
+                ip_address_data[ 'city' ] = 'Unknown'
+            if( ('region' not in ip_address_data) ):
+                ip_address_data[ 'region' ] = 'Unknown'
+            if( ('country' not in ip_address_data) ):
+                ip_address_data[ 'country' ] = 'Unknown'
+            if( ('loc' not in ip_address_data) ):
+                ip_address_data[ 'loc' ] = '0,0'
+            if( ('org' not in ip_address_data) ):
+                ip_address_data[ 'org' ] = 'Unknown'
+            if( ('postal' not in ip_address_data) ):
+                ip_address_data[ 'postal' ] = '0'
+            ip_checked.append( Address( ip_address_list[ x ], ip_address_data[ 'hostname' ], ip_address_data[ 'city' ], ip_address_data[ 'region' ], ip_address_data[ 'country' ], ip_address_data[ 'loc' ], ip_address_data[ 'org' ], ip_address_data[ 'postal' ] ) )
+
+        try:
+            email = n.get('From') or getHeaderVal('from', mail_data)
+            d = email.split('@')[1].replace(">","")
+            if d in emailFree:
+                summary[ 'email_domain_type' ] = 'Free Email Provider'
+            else:
+                summary[ 'email_domain_type' ] = 'Standard Email Provider'
+            w = whois.query(d , ignore_returncode=1)
+            if w:
+                wd = w.__dict__
+                for k, v in wd.items():
+                    summary[ k ] = v
+                    if k == 'creation_date':
+                        creation_date = datetime.today() - v
+                        months = round( creation_date.days / 60 )
+                        if months < 12:
+                            summary[ 'diff' ] = '( WARNING: ' + str( months ) + ' Months old! )'
+                        else:
+                            any = round( months / 12 )
+                            summary[ 'diff' ] = str( any ) + ' Years'
+        except Exception as e:
+            logging.exception( e )
+            summary[ 'name' ] = 'Error getting value'
+            summary[ 'creation_date' ] = 'Error getting value'
+            summary[ 'last_updated' ] = 'Error getting value'
+            summary[ 'expiration_date' ] = 'Error getting value'
+            summary[ 'name_servers' ] = 'Error getting value'
+            summary[ 'whois_error'] = str(e)
+
+        security_analysis = n.get('Authentication-Results') or getHeaderVal('Authentication-Results', mail_data)
+        security_points = 0
+        if security_analysis.find('spf=pass') >= 0:
+            summary[ 'SPF' ] = 'OK.'
+            security_points += 1
+        else:
+            if security_analysis.find('spf=') >= 0:
+                summary[ 'SPF' ] = 'WARNING'
+                security_points -= 2
+            else:
+                summary[ 'SPF' ] = 'WARNING: Without SPF'
+
+        if security_analysis.find('dkim=pass') >= 0:
+            summary[ 'DKIM' ] = 'OK.'
+            security_points += 1
+        else:
+            if security_analysis.find('dkim=') >= 0:
+                summary[ 'DKIM' ] = 'WARNING'
+                security_points -= 2
+            else:
+                summary[ 'DKIM' ] = 'WARNING: Without DKIM'
+
+        if security_analysis.find('dmarc=pass') >= 0:
+            summary[ 'DMARC' ] = 'OK.'
+            security_points += 1
+        else:
+            if security_analysis.find('dmarc=') >= 0:
+                summary[ 'DMARC' ] = 'WARNING'
+                security_points -= 2
+            else:
+                summary[ 'DMARC' ] = 'WARNING: Without DMARC'
+
+        summary[ 'security_result' ] = str( round( (security_points / 3) * 100, 2 ) ) + '%'
+
         return render_template(
             'index.html', data=r, delayed=delayed, summary=summary,
-            n=n, chart=chart, security_headers=security_headers)
+            n=n, chart=chart, security_headers=security_headers, ip_checked=ip_checked)
     else:
         return render_template('index.html')
 
+class Address:
+  def __init__(self, ip_address, hostname = 'unknown', city = 'unknown', region = 'unknown', country = 'unknown', gps = 'unknown', organization = 'unknown', postal_code = 'unknown' ):
+    self.ip_address = ip_address
+    self.hostname = hostname
+    self.city = city
+    self.region = region
+    self.country = country
+    self.gps = gps
+    self.organization = organization
+    self.postal_code = postal_code
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mail Header Analyser")
