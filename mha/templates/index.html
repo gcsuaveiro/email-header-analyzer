@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
@@ -9,7 +9,7 @@
     <meta name="description" content="">
     <meta name="author" content="">
     <link rel="icon" href="{{url_for('static', filename='imgs/fav.png')}}">
-    <title>Analisis cabecera EMAIL Tarraco Import Export S.L. (REPU_1)</title>
+    <title>Mail Header Analyzer (MHA)</title>
     <!-- Bootstrap core CSS -->
     <link href="{{url_for('static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
     <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
@@ -36,16 +36,23 @@
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
                     aria-expanded="false" aria-controls="navbar">
-                    <span class="sr-only">cambia navegación</span>
+                    <span class="sr-only">Toggle navigation</span>
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="/">Analisis cabecera EMAIL<small>(REPU 1)</small></a>
+                <a class="navbar-brand" href="/">Mail Header Analyzer <small>(MHA)</small></a>
             </div>
             <div id="navbar" class="collapse navbar-collapse">
                 <ul class="nav navbar-nav">
-                    <li class="active"><a href="/">Inicio</a></li>
+                    <li class="active"><a href="/">Home</a></li>
+                    {#
+                    <li><a href="#about">About</a></li> #} {#
+                    <li><a href="#contact">Contact</a></li> #}
+                </ul>
+                <ul class="nav navbar-nav navbar-right icons">
+                    <li><a href="https://github.com/lnxg33k/MHA" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li><a href="https://twitter.com/lnxg33k" target="_blank"><i class="fab fa-twitter"></i></a></li>
                 </ul>
             </div>
             <!--/.nav-collapse -->
@@ -58,17 +65,17 @@
             <div class="row" style="padding-top: 15px;">
                 <div class="col-md-6">
                     <dl class="dl-horizontal">
-                        <dt>Titulo</dt>
+                        <dt>Subject</dt>
                         <dd>{{ summary.Subject }}</dd>
-                        <dt>ID</dt>
+                        <dt>Message-ID</dt>
                         <dd>{{ summary.MessageID }}</dd>
-                        <dt>Fecha creación</dt>
+                        <dt>Creation time (Date)</dt>
                         <dd>{{ summary.Date }}</dd>
-                        <dt>De</dt>
+                        <dt>From</dt>
                         <dd>{{ summary.From }}</dd>
-                        <dt>Retorna A</dt>
+                        <dt>Return</dt>
                         <dd>{{ summary.Return }}</dd>
-                        <dt>Para</dt>
+                        <dt>To</dt>
                         <dd>{{ summary.To }}</dd>
                         {% if summary.Cc %}
                         <dt>Cc</dt>
@@ -76,32 +83,36 @@
                         {% endif %}
                         <dt>-</dt>
                         <dd>-</dd>
-                        <dt>Dominio EMISOR</dt>
+                        <dt>Sender Domain</dt>
+                        {% if summary.whois_error %}
+                        <dd>{{ summary.whois_error }}</dd>
+                        {% else %}
                         <dd>{{ summary.name }}</dd>
-                        <dt>Tipo Correo</dt>
-                        <dd>{{ summary.tipo }}</dd>
-                        <dt>DOMINIO Creado</dt>
+                        {% endif %}
+                        <dt>Type</dt>
+                        <dd>{{ summary.email_domain_type }}</dd>
+                        {% if not summary.whois_error %}
+                        <dt>Domain Creation Date</dt>
                         <dd>{{ summary.creation_date }} : {{ summary.diff }}</dd>
-                        <dt>DOMINIO Actualizado</dt>
+                        <dt>Domain Update Date</dt>
                         <dd>{{ summary.last_updated }}</dd>
-                        <dt>Caduca el DOMINIO</dt>
+                        <dt>Domain Expire Date</dt>
                         <dd>{{ summary.expiration_date }}</dd>
-                        <dt>Servidores NOMBRES</dt>
+                        <dt>Domain Nameservers</dt>
                         <dd>{{ summary.name_servers }}</dd>
+                        {% endif %}
                         <dt>-</dt>
                         <dd>-</dd>
-                        <dt>WEB EMISOR</dt>
-                        <dd><a href="http://www.{{ summary.name }}">http://www.{{ summary.name }}</a> ( ASEGURA QUE LA WEB COINCIDE CON LA DE LA EMPRESA )</dd>
                         <dt>-</dt>
                         <dd>-</dd>
-                        <dt>SEGURIDAD SPF</dt>
+                        <dt>SPF</dt>
                         <dd>{{ summary.SPF }}</dd>
-                        <dt>SEGURIDAD DKIM</dt>
+                        <dt>DKIM</dt>
                         <dd>{{ summary.DKIM }}</dd>
-                        <dt>SEGURIDAD DMARC</dt>
+                        <dt>DMARC</dt>
                         <dd>{{ summary.DMARC }}</dd>
-                        <dt>RESULTADO SEGURIDAD</dt>
-                        <dd>{{ summary.resultado_seguridad }}</dd>
+                        <dt>Security Result</dt>
+                        <dd>{{ summary.security_result}}</dd>
                     </dl>
                 </div>
                 {% if delayed %}
@@ -118,26 +129,26 @@
             <thead style="background-color: #333333;color:#d4d4d4;">
                 <tr>
                     <th data-sortable="true">IP</th>
-                    <th data-sortable="true">NOMBRE</th>
-                    <th data-sortable="true">PAIS</th>
-                    <th data-sortable="true">CIUDAD</th>
-                    <th data-sortable="true">REGION</th>
+                    <th data-sortable="true">Name</th>
+                    <th data-sortable="true">Country</th>
+                    <th data-sortable="true">City</th>
+                    <th data-sortable="true">Regions</th>
                     <th data-sortable="true">GPS</th>
-                    <th data-sortable="true">EMPRESA</th>
-                    <th data-sortable="true">CP</th>
+                    <th data-sortable="true">Organization</th>
+                    <th data-sortable="true">Postal Code</th>
                 </tr>
             </thead>
             <tbody>
-                {% for v in iP_Analizado %}
+                {% for v in ip_checked %}
                 <tr>
-                    <td>{{ v.iP }}</td>
+                    <td>{{ v.ip_address }}</td>
                     <td>{{ v.hostname }}</td>
-                    <td>{{ v.pais }}</td>
-                    <td>{{ v.ciudad }}</td>
+                    <td>{{ v.country }}</td>
+                    <td>{{ v.city}}</td>
                     <td>{{ v.region }}</td>
                     <td>{{ v.gps }}</td>
-                    <td>{{ v.empresa }}</td>
-                    <td>{{ v.cp }}</td>
+                    <td>{{ v.organization }}</td>
+                    <td>{{ v.postal_code }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -148,11 +159,11 @@
             <thead style="background-color: #333333;color:#d4d4d4;">
                 <tr>
                     <th data-field="hop" data-sortable="true">Hop</th>
-                    <th data-sortable="true">Origen</th>
-                    <th data-sortable="true">Desde</th>
-                    <th data-sortable="true">Con</th>
-                    <th data-sortable="true">Fecha (UTC)</th>
-                    <th data-sortable="true">Tiempo</th>
+                    <th data-sortable="true">From</th>
+                    <th data-sortable="true">By</th>
+                    <th data-sortable="true">With</th>
+                    <th data-sortable="true">Time (UTC)</th>
+                    <th data-sortable="true">Delay</th>
                 </tr>
             </thead>
             <tbody>
@@ -182,7 +193,7 @@
         <div class="panel panel-default" style="margin-top: 10px;">
             <!-- Default panel contents -->
             <div class="panel-heading">
-                <h3 class="panel-title">Cabeceras de seguridad</h3>
+                <h3 class="panel-title">Security Headers</h3>
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -216,7 +227,7 @@
         <div class="panel panel-default" style="margin-top: 10px;">
             <!-- Default panel contents -->
             <div class="panel-heading">
-                <h3 class="panel-title">Otras cabeceras</h3>
+                <h3 class="panel-title">Other headers</h3>
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered">
@@ -233,12 +244,16 @@
         {% else %}
         <div class="row">
             <div class="col-md-12">
-                <form method="POST">
+                <form method="POST" enctype = "multipart/form-data">
                     <div class="form-group">
-                        <textarea name='headers' class="form-control" rows="25" placeholder="Copia todo el mail aquí."
-                            autofocus required></textarea>
+                        <textarea name='headers' class="form-control" rows="25" placeholder="Paste the header in here."
+                            autofocus></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-lg btn-block">Analiza EMAIL !</button>
+                    or
+                    <div class="form-control">
+                        <input type = "file" name = "file" />
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block">Analyze This !</button>
                 </form>
             </div>
         </div>

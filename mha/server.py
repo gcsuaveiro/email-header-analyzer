@@ -23,6 +23,8 @@ import whois
 import json
 import urllib.request
 
+import logging
+
 app = Flask(__name__)
 reader = geoip2.database.Reader(
     '%s/data/GeoLite2-Country.mmdb' % app.static_folder)
@@ -40,12 +42,15 @@ def utility_processor():
         if ip:
             ip = ip[0]  # take the 1st ip and ignore the rest
             if IP(ip).iptype() == 'PUBLIC':
-                r = reader.country(ip).country
-                if r.iso_code and r.name:
-                    return {
-                        'iso_code': r.iso_code.lower(),
-                        'country_name': r.name
-                    }
+                try:
+                    r = reader.country(ip).country
+                    if r.iso_code and r.name:
+                        return {
+                            'iso_code': r.iso_code.lower(),
+                            'country_name': r.name
+                        }
+                except:
+                    pass
     return dict(country=getCountryForIP)
 
 
@@ -90,14 +95,24 @@ def getHeaderVal(h, data, rex='\s*(.*?)\n\S+:\s'):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        # fill mail data with either uploaded file or form, upload has priority
+        mail_data = ""
+        try:
+            # if there is a file upload, read the file, and decode the binary stream
+            eml = request.files['file']
+            mail_data = eml.read().decode()
+        except Exception as e:
+            # if anything goes wrong, revert to form
+            mail_data = request.form['headers'].strip()
+
         with open( 'freemail' ) as f:
             emailFree = [ line.rstrip() for line in f ]
-        lista_IP = []
+        ip_address_list = []
         mail_data = request.form['headers'].strip()
         r = {}
         n = HeaderParser().parsestr(mail_data)
         graph = []
-        iP_Analizado = []
+        ip_checked = []
         received = n.get_all('Received')
         if received:
             received = [i for i in received if ('from' in i or 'by' in i)]
@@ -142,7 +157,7 @@ def index():
                     )""", line[0], re.DOTALL | re.X)
                 tmp_lista_IP = re.findall( r"\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]", line[0], re.X)
                 for x in range( len( tmp_lista_IP ) ):
-                    lista_IP.append( tmp_lista_IP[ x ] )
+                    ip_address_list.append( tmp_lista_IP[ x ] )
             else:
                 data = re.findall(
                     """
@@ -156,8 +171,8 @@ def index():
                     )""", line[0], re.DOTALL | re.X)
 
             delay = (org_time - next_time).seconds
-            if delay <= 0:
-                delay = 1
+            if delay < 0:
+                delay = 0
 
             try:
                 ftime = org_time.utctimetuple()
@@ -192,8 +207,8 @@ def index():
             style=custom_style, height=250, legend_at_bottom=True,
             tooltip_border_radius=10)
         line_chart.tooltip_fancy_mode = False
-        line_chart.title = 'Tiempo total: %s' % fTotalDelay
-        line_chart.x_title = 'Tiempo en segundos.'
+        line_chart.title = 'Total Delay is: %s' % fTotalDelay
+        line_chart.x_title = 'Delay in seconds.'
         for i in graph:
             line_chart.add(i[0], i[1])
         chart = line_chart.render(is_unicode=True)
@@ -209,114 +224,118 @@ def index():
         }
 
         security_headers = ['Received-SPF', 'Authentication-Results',
-                            'DKIM-Signature', 'ARC-Authentication-Results' ]
+                            'DKIM-Signature', 'ARC-Authentication-Results']
 
-        for x in range( len( lista_IP ) ):
-            web = 'http://ipinfo.io/' + lista_IP[ x ] + '/json'
+        for x in range( len( ip_address_list ) ):
+            web = 'http://ipinfo.io/' + ip_address_list[ x ] + '/json'
+
             with urllib.request.urlopen( web ) as url:
-                datos_ip = json.loads( url.read().decode() )
-            if( ('hostname' not in datos_ip) ):
-                datos_ip[ 'hostname' ] = 'Desconocido'
-            if( ('city' not in datos_ip) ):
-                datos_ip[ 'city' ] = 'Desconocida'
-            if( ('region' not in datos_ip) ):
-                datos_ip[ 'region' ] = 'Desconocida'
-            if( ('country' not in datos_ip) ):
-                datos_ip[ 'country' ] = 'Desconocido'
-            if( ('loc' not in datos_ip) ):
-                datos_ip[ 'loc' ] = '0,0'
-            if( ('org' not in datos_ip) ):
-                datos_ip[ 'org' ] = 'Desconocida'
-            if( ('postal' not in datos_ip) ):
-                datos_ip[ 'postal' ] = '0'
-            iP_Analizado.append( Address( lista_IP[ x ], datos_ip[ 'hostname' ], datos_ip[ 'city' ], datos_ip[ 'region' ], datos_ip[ 'country' ], datos_ip[ 'loc' ], datos_ip[ 'org' ], datos_ip[ 'postal' ] ) )
+                ip_address_data = json.loads( url.read().decode() )
+            if( ('hostname' not in ip_address_data) ):
+                ip_address_data[ 'hostname' ] = 'Unknown'
+            if( ('city' not in ip_address_data) ):
+                ip_address_data[ 'city' ] = 'Unknown'
+            if( ('region' not in ip_address_data) ):
+                ip_address_data[ 'region' ] = 'Unknown'
+            if( ('country' not in ip_address_data) ):
+                ip_address_data[ 'country' ] = 'Unknown'
+            if( ('loc' not in ip_address_data) ):
+                ip_address_data[ 'loc' ] = '0,0'
+            if( ('org' not in ip_address_data) ):
+                ip_address_data[ 'org' ] = 'Unknown'
+            if( ('postal' not in ip_address_data) ):
+                ip_address_data[ 'postal' ] = '0'
+            ip_checked.append( Address( ip_address_list[ x ], ip_address_data[ 'hostname' ], ip_address_data[ 'city' ], ip_address_data[ 'region' ], ip_address_data[ 'country' ], ip_address_data[ 'loc' ], ip_address_data[ 'org' ], ip_address_data[ 'postal' ] ) )
 
         try:
             email = n.get('From') or getHeaderVal('from', mail_data)
             d = email.split('@')[1].replace(">","")
             if d in emailFree:
-                summary[ 'tipo' ] = ' ( CUIDADO CORREO GRATUITO )'
+                summary[ 'email_domain_type' ] = 'Free Email Provider'
             else:
-                summary[ 'tipo' ] = 'Correo electronico normal'
+                summary[ 'email_domain_type' ] = 'Standard Email Provider'
             w = whois.query(d , ignore_returncode=1)
             if w:
                 wd = w.__dict__
                 for k, v in wd.items():
-                    summary[ k ] = v        # SE RELLENAN LOS DATOS DE WHOIS  __DICT__
+                    summary[ k ] = v
                     if k == 'creation_date':
-                        fecha = datetime.today() - v
-                        meses = round( fecha.days / 60 )
-                        if meses < 12:
-                            summary[ 'diff' ] = ' ( PELIGRO ' + str( meses ) + ' MESES DE VIDA!!!! )'
+                        creation_date = datetime.today() - v
+                        months = round( creation_date.days / 60 )
+                        if months < 12:
+                            summary[ 'diff' ] = '( WARNING: ' + str( months ) + ' Months old! )'
                         else:
-                            any = round( meses / 12 )
-                            summary[ 'diff' ] = str( any ) + ' Años'
+                            any = round( months / 12 )
+                            summary[ 'diff' ] = str( any ) + ' Years'
         except Exception as e:
-            print( e )
-            summary[ 'name' ] = 'ERROR AL BUSCAR'
-            summary[ 'creation_date' ] = 'ERROR AL BUSCAR'
-            summary[ 'last_updated' ] = 'ERROR AL BUSCAR'
-            summary[ 'expiration_date' ] = 'ERROR AL BUSCAR'
-            summary[ 'name_servers' ] = 'ERROR AL BUSCAR'
+            logging.exception( e )
+            summary[ 'name' ] = 'Error getting value'
+            summary[ 'creation_date' ] = 'Error getting value'
+            summary[ 'last_updated' ] = 'Error getting value'
+            summary[ 'expiration_date' ] = 'Error getting value'
+            summary[ 'name_servers' ] = 'Error getting value'
+            summary[ 'whois_error'] = str(e)
 
-        analiza = n.get('Authentication-Results') or getHeaderVal('Authentication-Results', mail_data)
-        puntuacion = 0
-        if analiza.find('spf=pass') >= 0:
+        security_analysis = n.get('Authentication-Results') or getHeaderVal('Authentication-Results', mail_data)
+        security_points = 0
+        if security_analysis.find('spf=pass') >= 0:
             summary[ 'SPF' ] = 'OK.'
-            puntuacion += 1
+            security_points += 1
         else:
-            if analiza.find('spf=') >= 0:
-                summary[ 'SPF' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
-                puntuacion -= 2
+            if security_analysis.find('spf=') >= 0:
+                summary[ 'SPF' ] = 'WARNING'
+                security_points -= 2
             else:
-                summary[ 'SPF' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+                summary[ 'SPF' ] = 'WARNING: Without SPF'
 
-        if analiza.find('dkim=pass') >= 0:
+        if security_analysis.find('dkim=pass') >= 0:
             summary[ 'DKIM' ] = 'OK.'
-            puntuacion += 1
+            security_points += 1
         else:
-            if analiza.find('dkim=') >= 0:
-                summary[ 'DKIM' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
-                puntuacion -= 2
+            if security_analysis.find('dkim=') >= 0:
+                summary[ 'DKIM' ] = 'WARNING'
+                security_points -= 2
             else:
-                summary[ 'DKIM' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+                summary[ 'DKIM' ] = 'WARNING: Without DKIM'
 
-        if analiza.find('dmarc=pass') >= 0:
+        if security_analysis.find('dmarc=pass') >= 0:
             summary[ 'DMARC' ] = 'OK.'
-            puntuacion += 1
+            security_points += 1
         else:
-            if analiza.find('dmarc=') >= 0:
-                summary[ 'DMARC' ] = 'PELIGRO !!!!!! ( MUCHO CUIDADO )'
-                puntuacion -= 2
+            if security_analysis.find('dmarc=') >= 0:
+                summary[ 'DMARC' ] = 'WARNING'
+                security_points -= 2
             else:
-                summary[ 'DMARC' ] = ' SIN SEGURIDAD ( REVISA QUE EL EL ORIGEN Y A DONDE SE RETORNA EL MAIL )'
+                summary[ 'DMARC' ] = 'WARNING: Without DMARC'
 
-        summary[ 'resultado_seguridad' ] = str( round( (puntuacion / 3) * 100, 2 ) ) + '%'
+        summary[ 'security_result' ] = str( round( (security_points / 3) * 100, 2 ) ) + '%'
 
         return render_template(
             'index.html', data=r, delayed=delayed, summary=summary,
-            n=n, chart=chart, security_headers=security_headers, iP_Analizado=iP_Analizado)
+            n=n, chart=chart, security_headers=security_headers, ip_checked=ip_checked)
     else:
         return render_template('index.html')
 
 class Address:
-  def __init__(self, iP, hostname = 'desconocido', ciudad = 'desconocido', region = 'desconocido', pais = 'desconocido', gps = 'desconocido', empresa = 'desconocido', cp = 'desconocido' ):
-    self.iP = iP
+  def __init__(self, ip_address, hostname = 'unknown', city = 'unknown', region = 'unknown', country = 'unknown', gps = 'unknown', organization = 'unknown', postal_code = 'unknown' ):
+    self.ip_address = ip_address
     self.hostname = hostname
-    self.ciudad = ciudad
+    self.city = city
     self.region = region
-    self.pais = pais
+    self.country = country
     self.gps = gps
-    self.empresa = empresa
-    self.cp = cp
+    self.organization = organization
+    self.postal_code = postal_code
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mail Header Analyser")
     parser.add_argument("-d", "--debug", action="store_true", default=False,
                         help="Enable debug mode")
-    parser.add_argument("-b", "--bind", default="0.0.0.0", type=str)
+    parser.add_argument("-b", "--bind", default="127.0.0.1", type=str)
     parser.add_argument("-p", "--port", default="8080", type=int)
     args = parser.parse_args()
 
     app.debug = args.debug
+    app.config['UPLOAD_FOLDER']        = "."
+    app.config['MAX_CONTENT-PATH'] = 100000
     app.run(host=args.bind, port=args.port)
