@@ -278,38 +278,42 @@ def index():
 
         security_analysis = n.get('Authentication-Results') or getHeaderVal('Authentication-Results', mail_data)
         security_points = 0
-        if security_analysis.find('spf=pass') >= 0:
-            summary[ 'SPF' ] = 'OK.'
-            security_points += 1
-        else:
-            if security_analysis.find('spf=') >= 0:
-                summary[ 'SPF' ] = 'WARNING'
-                security_points -= 2
+        if security_analysis is not None:
+            if security_analysis.find('spf=pass') >= 0:
+                summary[ 'SPF' ] = 'OK.'
+                security_points += 1
             else:
-                summary[ 'SPF' ] = 'WARNING: Without SPF'
+                if security_analysis.find('spf=') >= 0:
+                    summary[ 'SPF' ] = 'WARNING'
+                    security_points -= 2
+                else:
+                    summary[ 'SPF' ] = 'WARNING: Without SPF'
 
-        if security_analysis.find('dkim=pass') >= 0:
-            summary[ 'DKIM' ] = 'OK.'
-            security_points += 1
-        else:
-            if security_analysis.find('dkim=') >= 0:
-                summary[ 'DKIM' ] = 'WARNING'
-                security_points -= 2
+            if security_analysis.find('dkim=pass') >= 0:
+                summary[ 'DKIM' ] = 'OK.'
+                security_points += 1
             else:
-                summary[ 'DKIM' ] = 'WARNING: Without DKIM'
-
-        if security_analysis.find('dmarc=pass') >= 0:
-            summary[ 'DMARC' ] = 'OK.'
-            security_points += 1
-        else:
-            if security_analysis.find('dmarc=') >= 0:
-                summary[ 'DMARC' ] = 'WARNING'
-                security_points -= 2
+                if security_analysis.find('dkim=') >= 0:
+                    summary[ 'DKIM' ] = 'WARNING'
+                    security_points -= 2
+                else:
+                    summary[ 'DKIM' ] = 'WARNING: Without DKIM'
+    
+            if security_analysis.find('dmarc=pass') >= 0:
+                summary[ 'DMARC' ] = 'OK.'
+                security_points += 1
             else:
-                summary[ 'DMARC' ] = 'WARNING: Without DMARC'
+                if security_analysis.find('dmarc=') >= 0:
+                    summary[ 'DMARC' ] = 'WARNING'
+                    security_points -= 2
+                else:
+                    summary[ 'DMARC' ] = 'WARNING: Without DMARC'
 
-        summary[ 'security_result' ] = str( round( (security_points / 3) * 100, 2 ) ) + '%'
-
+            summary[ 'security_result' ] = str( round( (security_points / 3) * 100, 2 ) ) + '%'
+        else:
+            for key in ['SPF', 'DKIM', 'DMARK']:
+                summary[key] = 'ERROR'
+                
         return render_template(
             'index.html', data=r, delayed=delayed, summary=summary,
             n=n, chart=chart, security_headers=security_headers, ip_checked=ip_checked)
