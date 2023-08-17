@@ -35,11 +35,14 @@ git clone https://github.com/gcsuaveiro/email-header-analyzer.git
 ```
 Install Python dependencies:
 ```
-cd MHA
+cd email-header-analyzer
 pip3 install -r requirements.txt
 ```
 Run the development server:
-`python3 server.py -d`
+```
+cd mha
+python3 server.py -d
+```
 
 You can change the bind address or port by specifying the appropriate options:
 `python3 server.py -b 0.0.0.0 -p 8080`
